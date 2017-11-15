@@ -20,6 +20,8 @@
 
 package nextflow.processor
 
+import nextflow.container.ContainerNormalizer
+
 import java.nio.file.NoSuchFileException
 import java.nio.file.Path
 
@@ -539,24 +541,9 @@ class TaskRun implements Cloneable {
         }
 
         final cfg = getContainerConfig()
-        final engine = cfg.getEngine()
-        if( engine == 'shifter' ) {
-            ShifterBuilder.normalizeImageName(imageName, cfg)
-        }
-        else if( engine == 'udocker' ) {
-            UdockerBuilder.normalizeImageName(imageName)
-        }
-        else if( engine == 'singularity' ) {
-            if( !imageName )
-                return null
-            if( imageName.startsWith('docker://') || imageName.startsWith('shub://'))
-                return new SingularityCache(cfg) .getCachePathFor(imageName) .toString()
-            else
-                return SingularityBuilder.normalizeImageName(imageName)
-        }
-        else {
-            DockerBuilder.normalizeImageName(imageName, cfg)
-        }
+        final n =  new ContainerNormalizer(cfg)
+
+        n.normalizeImageName(imageName)
     }
 
     ContainerConfig getContainerConfig() {
