@@ -3,35 +3,46 @@ package nextflow.trace
 import java.text.DecimalFormat
 
 /**
+ * Value object representing the workflow execution statistics
  *
  * @author Paolo Di Tommaso <paolo.ditommaso@gmail.com>
  */
 class WorkflowStats {
 
     /**
-     * Overall workflow compute time as CPUs-seconds for task executed successfully
+     * Overall workflow compute time (CPUs-seconds) for task executed successfully
      */
     long timeSucceed
 
     /**
-     * Overall compute time for cached tasks
+     * Overall compute time (CPUs-seconds) for cached tasks
      */
     long timeCached
 
     /**
-     * Overall compute time for failed tasks
+     * Overall compute time (CPUs-seconds) for failed tasks
      */
     long timeFailed
 
-    long countSuccess
-
+    /**
+     * Task successfully completed
+     */
     long completed
 
+    /**
+     * Task cached
+     */
     long cached
 
-    long countFailed
+    /**
+     * Task terminated with an error
+     */
+    long failed
 
-    long countIgnored
+    /**
+     * Task executions terminated with an error which was ignored
+     */
+    long ignored
 
     /**
      * @return A formatted string representing the overall execution time as CPU-Hours

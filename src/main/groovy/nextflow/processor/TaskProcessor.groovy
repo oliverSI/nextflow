@@ -1041,7 +1041,7 @@ class TaskProcessor {
     final synchronized resumeOrDie( TaskRun task, Throwable error ) {
         log.trace "Handling unexpected condition for\n  task: $task\n  error [${error?.class?.name}]: ${error?.getMessage()?:error}"
 
-        ErrorStrategy errorStrategy = TERMINATE
+        task.errorAction = TERMINATE
         final message = []
         try {
             // -- do not recoverable error, just re-throw it
@@ -1054,7 +1054,7 @@ class TaskProcessor {
                 taskCopy.runType = RunType.RETRY
                 session.getExecService().submit { checkCachedOrLaunchTask( taskCopy, taskCopy.hash, false ) }
                 task.failed = true
-                return RETRY
+                return task.errorAction = RETRY
             }
 
             final int taskErrCount = task ? ++task.failCount : 0
@@ -1068,14 +1068,14 @@ class TaskProcessor {
                 task.config.errorCount = procErrCount
                 task.config.retryCount = taskErrCount
 
-                errorStrategy = checkErrorStrategy(task, error, taskErrCount, procErrCount)
-                if( errorStrategy.soft ) {
+                task.errorAction = checkErrorStrategy(task, error, taskErrCount, procErrCount)
+                if( task.errorAction.soft ) {
                     def msg = "[$task.hashLog] NOTE: $error.message"
-                    if( errorStrategy == IGNORE ) msg += " -- Error is ignored"
-                    else if( errorStrategy == RETRY ) msg += " -- Execution is retried ($taskErrCount)"
+                    if( task.errorAction == IGNORE ) msg += " -- Error is ignored"
+                    else if( task.errorAction == RETRY ) msg += " -- Execution is retried ($taskErrCount)"
                     log.info msg
                     task.failed = true
-                    return errorStrategy
+                    return task.errorAction
                 }
             }
 
@@ -1085,7 +1085,7 @@ class TaskProcessor {
 
             // -- make sure the error is showed only the very first time across all processes
             if( errorShown.getAndSet(true) || session.aborted ) {
-                return errorStrategy
+                return task.errorAction
             }
 
             def dumpStackTrace = log.isTraceEnabled()
@@ -1113,25 +1113,25 @@ class TaskProcessor {
             log.error("Execution aborted due to an unexpected error", e )
         }
 
-        return new TaskFault(error: error, task: task, report: message.join('\n'), strategy: errorStrategy)
+        return new TaskFault(error: error, task: task, report: message.join('\n'))
     }
 
     protected ErrorStrategy checkErrorStrategy( TaskRun task, ProcessException error, final int taskErrCount, final int procErrCount ) {
 
-        final errorStrategy = task.config.getErrorStrategy()
+        final action = task.config.getErrorStrategy()
 
         // retry is not allowed when the script cannot be compiled or similar errors
         if( error instanceof ProcessUnrecoverableException ) {
-            return !errorStrategy.soft ? errorStrategy : ErrorStrategy.TERMINATE
+            return !action.soft ? action : TERMINATE
         }
 
         // IGNORE strategy -- just continue
-        if( errorStrategy == ErrorStrategy.IGNORE ) {
-            return ErrorStrategy.IGNORE
+        if( action == IGNORE ) {
+            return IGNORE
         }
 
         // RETRY strategy -- check that process do not exceed 'maxError' and the task do not exceed 'maxRetries'
-        if( errorStrategy == ErrorStrategy.RETRY ) {
+        if( action == RETRY ) {
             final int maxErrors = task.config.getMaxErrors()
             final int maxRetries = task.config.getMaxRetries()
 
@@ -1156,7 +1156,7 @@ class TaskProcessor {
             return TERMINATE
         }
 
-        return errorStrategy
+        return action
     }
 
     final protected List<String> formatGuardError( List<String> message, FailedGuardException error, TaskRun task ) {
